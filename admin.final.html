@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SwiftX Admin Dashboard</title>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js">
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js">
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #f0f2f5;
+            --card: #ffffff;
+            --sidebar: #0b1e33;
+            --sidebar-text: #cbd5e1;
+            --header: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+            --accent: #f47920;
+            --accent-hover: #e06810;
+            --success: #10b981;
+            --danger: #ef4444;
+            --shadow: 0 2px 8px rgba(0,0,0,0.06);
+            --radius: 12px;
+        }
+        body.dark {
+            --bg: #111827;
+            --card: #1f2937;
+            --header: #1f2937;
+            --text: #f1f5f9;
+            --text-light: #9ca3af;
+            --border: #374151;
+            --shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            min-height: 100vh;
+            transition: background 0.3s, color 0.3s;
+        }
+        .sidebar {
+            width: 260px;
+            background: var(--sidebar);
+            color: #fff;
+            height: 100vh;
+            position: fixed;
+            left: 0;
+            top: 0;
+            display: flex;
+            flex-direction: column;
+            z-index: 1000;
+            transition: transform 0.3s;
+        }
+        .sidebar-logo {
+            padding: 24px 20px;
+            font-size: 1.6rem;
+            font-weight: 800;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sidebar-nav {
+            flex: 1;
+            padding: 20px 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .sidebar-nav a {
+            color: var(--sidebar-text);
+            text-decoration: none;
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-left: 3px solid transparent;
+            transition: 0.2s;
+        }
+        .sidebar-nav a:hover, .sidebar-nav a.active {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            border-left-color: #f47920;
+        }
+        .main {
+            margin-left: 260px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .header {
+            background: var(--header);
+            border-bottom: 1px solid var(--border);
+            padding: 0 24px;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: var(--shadow);
+            position: sticky;
+            top: 0;
+            z-index: 500;
+        }
+        .page-content {
+            padding: 24px;
+            flex: 1;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .stat-card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+        }
+        .card {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td {
+            padding: 12px 14px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        th { color: var(--text-light); font-weight: 600; }
+        .status-badge {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        .status-booked { background: #e8f0fb; color: #1e4d7b; }
+        .status-transit { background: #fff3eb; color: #c2660a; }
+        .status-delivered { background: #ecfdf5; color: #047857; }
+        .status-returned { background: #fef2f2; color: #b91c1c; }
+        .btn {
+            padding: 10px 20px;
+            border-radius: 24px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: var(--text); }
+        .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            display: none;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 28px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+            .sidebar { transform: translateX(-100%); }
+            .sidebar.open { transform: translateX(0); }
+            .main { margin-left: 0; }
+            .menu-toggle { display: block; }
+        }
+        .menu-toggle { display: none; background: none; border: none; font-size: 1.6rem; cursor: pointer; }
+        .connected-indicator { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+        .connected { color: #10b981; }
+        .disconnected { color: #ef4444; }
+    </style>
+</head>
+<body class="light">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo"><i class="fas fa-boxes"></i> SwiftX Admin</div>
+        <nav class="sidebar-nav">
+            <a href="#" data-page="dashboard" class="active"><i class="fas fa-th-large"></i> Dashboard</a>
+            <a href="#" data-page="bookings"><i class="fas fa-list-alt"></i> Bookings</a>
+            <a href="#" data-page="tracking"><i class="fas fa-search"></i> Tracking</a>
+            <a href="#" data-page="customers"><i class="fas fa-users"></i> Customers</a>
+            <a href="#" data-page="reports"><i class="fas fa-chart-bar"></i> Reports</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <div class="main" id="mainContent">
+        <header class="header">
+            <div style="display:flex;align-items:center;gap:16px;">
+                <button class="menu-toggle" id="menuToggle"><i class="fas fa-bars"></i></button>
+                <span class="connected-indicator" id="connectionIndicator">
+                    <i class="fas fa-circle"></i> <span id="connectionText">Connecting...</span>
+                </span>
+            </div>
+            <button class="btn btn-outline btn-sm" id="themeToggle"><i class="fas fa-moon"></i> Dark</button>
+        </header>
+        <div class="page-content" id="pageContainer"></div>
+    </div>
+
+    <!-- Booking Detail Modal -->
+    <div class="modal-overlay" id="detailModal">
+        <div class="modal" id="detailContent"></div>
+    </div>
+
+    <script>
+        (function() {
+            // ============ FIREBASE CONFIGURATION (HARDCODED) ============
+            const FIREBASE_CONFIG = {
+                apiKey: "AIzaSyBYMaUxGLuzMbWQMzoYDiL8Q-3rGIn9JN4",
+                authDomain: "test-e7613.firebaseapp.com",
+                databaseURL: "https://test-e7613-default-rtdb.firebaseio.com",
+                projectId: "test-e7613",
+                storageBucket: "test-e7613.appspot.com",
+                messagingSenderId: "123456789012",
+                appId: "1:123456789012:web:abcdef123456"
+            };
+
+            // Initialize Firebase immediately
+            let firebaseReady = false;
+            let db = null;
+
+            function initializeFirebase() {
+                try {
+                    if (firebase.apps.length > 0) {
+                        firebase.app().delete();
+                    }
+                    firebase.initializeApp(FIREBASE_CONFIG);
+                    db = firebase.database();
+                    firebaseReady = true;
+                    updateConnectionIndicator(true);
+                    console.log('Firebase connected to:', FIREBASE_CONFIG.databaseURL);
+                } catch (error) {
+                    console.error('Firebase init error:', error);
+                    firebaseReady = false;
+                    db = null;
+                    updateConnectionIndicator(false);
+                }
+            }
+
+            function updateConnectionIndicator(connected) {
+                const indicator = document.getElementById('connectionIndicator');
+                const text = document.getElementById('connectionText');
+                if (indicator && text) {
+                    if (connected) {
+                        indicator.className = 'connected-indicator connected';
+                        indicator.innerHTML = '<i class="fas fa-circle"></i> <span>Firebase Connected</span>';
+                    } else {
+                        indicator.className = 'connected-indicator disconnected';
+                        indicator.innerHTML = '<i class="fas fa-circle"></i> <span>Firebase Disconnected</span>';
+                    }
+                }
+            }
+
+            // Initialize Firebase on load
+            initializeFirebase();
+
+            // ============ DATA SERVICE ============
+            const DataService = {
+                async getBookings() {
+                    if (firebaseReady && db) {
+                        try {
+                            const ref = db.ref('bookings');
+                            const snapshot = await ref.once('value');
+                            const data = snapshot.val();
+                            return data ? Object.values(data) : [];
+                        } catch (e) {
+                            console.error('Firebase read error:', e);
+                            return [];
+                        }
+                    } else {
+                        // Fallback to localStorage if Firebase fails
+                        return JSON.parse(localStorage.getItem('courier_bookings_local') || '[]');
+                    }
+                },
+                async addBooking(booking) {
+                    if (firebaseReady && db) {
+                        try {
+                            const ref = db.ref('bookings/' + booking.trackingNumber);
+                            await ref.set(booking);
+                            return true;
+                        } catch (e) {
+                            console.error('Firebase add error:', e);
+                            return false;
+                        }
+                    } else {
+                        const bookings = JSON.parse(localStorage.getItem('courier_bookings_local') || '[]');
+                        bookings.push(booking);
+                        localStorage.setItem('courier_bookings_local', JSON.stringify(bookings));
+                        return true;
+                    }
+                },
+                async updateBooking(trackingNumber, updates) {
+                    if (firebaseReady && db) {
+                        try {
+                            const ref = db.ref('bookings/' + trackingNumber);
+                            await ref.update(updates);
+                            return true;
+                        } catch (e) {
+                            console.error('Firebase update error:', e);
+                            return false;
+                        }
+                    } else {
+                        const bookings = JSON.parse(localStorage.getItem('courier_bookings_local') || '[]');
+                        const idx = bookings.findIndex(b => b.trackingNumber === trackingNumber);
+                        if (idx !== -1) {
+                            Object.assign(bookings[idx], updates);
+                            localStorage.setItem('courier_bookings_local', JSON.stringify(bookings));
+                        }
+                        return true;
+                    }
+                },
+                async deleteBooking(trackingNumber) {
+                    if (firebaseReady && db) {
+                        try {
+                            const ref = db.ref('bookings/' + trackingNumber);
+                            await ref.remove();
+                            return true;
+                        } catch (e) {
+                            console.error('Firebase delete error:', e);
+                            return false;
+                        }
+                    } else {
+                        const bookings = JSON.parse(localStorage.getItem('courier_bookings_local') || '[]');
+                        const filtered = bookings.filter(b => b.trackingNumber !== trackingNumber);
+                        localStorage.setItem('courier_bookings_local', JSON.stringify(filtered));
+                        return true;
+                    }
+                }
+            };
+
+            // ============ THEME ============
+            const themeToggle = document.getElementById('themeToggle');
+            function applyTheme(dark) {
+                document.body.classList.toggle('dark', dark);
+                themeToggle.innerHTML = dark ? '<i class="fas fa-sun"></i> Light' : '<i class="fas fa-moon"></i> Dark';
+                localStorage.setItem('admin_theme', dark ? 'dark' : 'light');
+            }
+            const savedTheme = localStorage.getItem('admin_theme') || 'light';
+            applyTheme(savedTheme === 'dark');
+            themeToggle.addEventListener('click', () => applyTheme(!document.body.classList.contains('dark')));
+
+            // ============ NAVIGATION ============
+            document.querySelectorAll('.sidebar-nav a[data-page]').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    loadPage(this.dataset.page);
+                    document.querySelectorAll('.sidebar-nav a').forEach(a => a.classList.remove('active'));
+                    this.classList.add('active');
+                });
+            });
+            document.getElementById('menuToggle').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('open');
+            });
+
+            async function loadPage(page) {
+                const container = document.getElementById('pageContainer');
+                switch (page) {
+                    case 'dashboard': await renderDashboard(); break;
+                    case 'bookings': await renderBookings(); break;
+                    case 'tracking': renderTracking(); break;
+                    case 'customers': await renderCustomers(); break;
+                    case 'reports': await renderReports(); break;
+                    default: await renderDashboard();
+                }
+            }
+
+            // ============ DASHBOARD ============
+            async function renderDashboard() {
+                const bookings = await DataService.getBookings();
+                const total = bookings.length;
+                const delivered = bookings.filter(b => b.status === 'Delivered').length;
+                const transit = bookings.filter(b => ['Picked Up','In Transit','Out For Delivery'].includes(b.status)).length;
+                const codPending = bookings.filter(b => b.codAmount > 0 && !['Delivered','Returned'].includes(b.status)).reduce((s,b) => s + b.codAmount, 0);
+                const codCollected = bookings.filter(b => b.codAmount > 0 && b.status === 'Delivered').reduce((s,b) => s + b.codAmount, 0);
+                document.getElementById('pageContainer').innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon" style="background:#e8f0fb;color:#2c5282;"><i class="fas fa-boxes"></i></div><div><h3>${total}</h3><p>Total Bookings</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#ecfdf5;color:#10b981;"><i class="fas fa-check-circle"></i></div><div><h3>${delivered}</h3><p>Delivered</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#fff3eb;color:#f47920;"><i class="fas fa-truck"></i></div><div><h3>${transit}</h3><p>In Transit</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#fef3c7;color:#b45309;"><i class="fas fa-hand-holding-usd"></i></div><div><h3>PKR ${codPending.toLocaleString()}</h3><p>COD Pending</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#d1fae5;color:#059669;"><i class="fas fa-coins"></i></div><div><h3>PKR ${codCollected.toLocaleString()}</h3><p>COD Collected</p></div></div>
+                    </div>
+                `;
+            }
+
+            // ============ BOOKINGS PAGE ============
+            async function renderBookings() {
+                const bookings = await DataService.getBookings();
+                let html = `
+                    <div class="card">
+                        <h3>Bookings Management</h3>
+                        <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;">
+                            <button class="btn btn-primary" id="addBookingBtn"><i class="fas fa-plus"></i> Add Booking</button>
+                            <select id="statusFilter" class="login-input" style="width:auto;padding:8px;border-radius:8px;border:1px solid var(--border);"><option value="">All Status</option><option>Booked</option><option>Picked Up</option><option>In Transit</option><option>Out For Delivery</option><option>Delivered</option><option>Returned</option></select>
+                            <input type="date" id="dateFilter" class="login-input" style="width:auto;padding:8px;border-radius:8px;border:1px solid var(--border);">
+                            <input type="text" id="cityFilter" class="login-input" placeholder="City" style="width:auto;padding:8px;border-radius:8px;border:1px solid var(--border);">
+                            <button class="btn btn-outline" id="applyFilterBtn">Filter</button>
+                            <button class="btn btn-outline" id="clearFilterBtn">Clear</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table>
+                                <thead><tr><th>Tracking #</th><th>Sender</th><th>Receiver</th><th>City</th><th>Date</th><th>COD</th><th>Status</th><th>Actions</th></tr></thead>
+                                <tbody id="bookingsTableBody">
+                                    ${bookings.map(b => `
+                                        <tr>
+                                            <td><strong>${b.trackingNumber}</strong></td>
+                                            <td>${b.senderName || 'N/A'}</td>
+                                            <td>${b.receiverName || 'N/A'}</td>
+                                            <td>${b.receiverCity || 'N/A'}</td>
+                                            <td>${b.bookingDate ? new Date(b.bookingDate).toLocaleDateString() : 'N/A'}</td>
+                                            <td>${b.codAmount || 0}</td>
+                                            <td><span class="status-badge status-${(b.status || 'booked').toLowerCase().replace(/\s+/g,'-')}">${b.status || 'Booked'}</span></td>
+                                            <td>
+                                                <button class="btn btn-sm btn-outline view-booking" data-tracking="${b.trackingNumber}"><i class="fas fa-eye"></i></button>
+                                                <select class="status-update" data-tracking="${b.trackingNumber}" style="padding:4px;border-radius:6px;margin-left:4px;">
+                                                    <option ${b.status==='Booked'?'selected':''}>Booked</option>
+                                                    <option ${b.status==='Picked Up'?'selected':''}>Picked Up</option>
+                                                    <option ${b.status==='In Transit'?'selected':''}>In Transit</option>
+                                                    <option ${b.status==='Out For Delivery'?'selected':''}>Out For Delivery</option>
+                                                    <option ${b.status==='Delivered'?'selected':''}>Delivered</option>
+                                                    <option ${b.status==='Returned'?'selected':''}>Returned</option>
+                                                </select>
+                                                <button class="btn btn-sm btn-outline delete-booking" data-tracking="${b.trackingNumber}"><i class="fas fa-trash"></i></button>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('pageContainer').innerHTML = html;
+                attachBookingEvents();
+            }
+
+            function attachBookingEvents() {
+                document.querySelectorAll('.view-booking').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const tn = this.dataset.tracking;
+                        const bookings = await DataService.getBookings();
+                        const b = bookings.find(bk => bk.trackingNumber === tn);
+                        if (b) viewBookingDetail(b);
+                    });
+                });
+                document.querySelectorAll('.status-update').forEach(select => {
+                    select.addEventListener('change', async function() {
+                        const tn = this.dataset.tracking;
+                        const newStatus = this.value;
+                        await DataService.updateBooking(tn, { status: newStatus });
+                        loadPage('bookings');
+                    });
+                });
+                document.querySelectorAll('.delete-booking').forEach(btn => {
+                    btn.addEventListener('click', async function() {
+                        const tn = this.dataset.tracking;
+                        if (confirm('Delete booking ' + tn + '?')) {
+                            await DataService.deleteBooking(tn);
+                            loadPage('bookings');
+                        }
+                    });
+                });
+                document.getElementById('addBookingBtn')?.addEventListener('click', showAddBookingForm);
+                document.getElementById('applyFilterBtn')?.addEventListener('click', applyFilters);
+                document.getElementById('clearFilterBtn')?.addEventListener('click', () => {
+                    document.getElementById('statusFilter').value = '';
+                    document.getElementById('dateFilter').value = '';
+                    document.getElementById('cityFilter').value = '';
+                    loadPage('bookings');
+                });
+            }
+
+            async function applyFilters() {
+                const status = document.getElementById('statusFilter').value;
+                const date = document.getElementById('dateFilter').value;
+                const city = document.getElementById('cityFilter').value.trim().toLowerCase();
+                let bookings = await DataService.getBookings();
+                if (status) bookings = bookings.filter(b => b.status === status);
+                if (date) bookings = bookings.filter(b => b.bookingDate && new Date(b.bookingDate).toDateString() === new Date(date).toDateString());
+                if (city) bookings = bookings.filter(b => (b.receiverCity || '').toLowerCase().includes(city));
+                document.getElementById('bookingsTableBody').innerHTML = bookings.map(b => `
+                    <tr>
+                        <td><strong>${b.trackingNumber}</strong></td>
+                        <td>${b.senderName || 'N/A'}</td>
+                        <td>${b.receiverName || 'N/A'}</td>
+                        <td>${b.receiverCity || 'N/A'}</td>
+                        <td>${b.bookingDate ? new Date(b.bookingDate).toLocaleDateString() : 'N/A'}</td>
+                        <td>${b.codAmount || 0}</td>
+                        <td><span class="status-badge status-${(b.status || 'booked').toLowerCase().replace(/\s+/g,'-')}">${b.status || 'Booked'}</span></td>
+                        <td>
+                            <button class="btn btn-sm btn-outline view-booking" data-tracking="${b.trackingNumber}"><i class="fas fa-eye"></i></button>
+                            <select class="status-update" data-tracking="${b.trackingNumber}"><option>Booked</option><option>Picked Up</option><option>In Transit</option><option>Out For Delivery</option><option>Delivered</option><option>Returned</option></select>
+                            <button class="btn btn-sm btn-outline delete-booking" data-tracking="${b.trackingNumber}"><i class="fas fa-trash"></i></button>
+                        </td>
+                    </tr>
+                `).join('');
+                attachBookingEvents();
+            }
+
+            function viewBookingDetail(b) {
+                document.getElementById('detailContent').innerHTML = `
+                    <h3>Booking: ${b.trackingNumber}</h3>
+                    <p><strong>Date:</strong> ${b.bookingDate ? new Date(b.bookingDate).toLocaleString() : 'N/A'}</p>
+                    <p><strong>Sender:</strong> ${b.senderName || 'N/A'} (${b.senderPhone || 'N/A'})</p>
+                    <p><strong>Receiver:</strong> ${b.receiverName || 'N/A'} (${b.receiverPhone || 'N/A'})</p>
+                    <p><strong>City:</strong> ${b.receiverCity || 'N/A'}</p>
+                    <p><strong>Parcel:</strong> ${b.parcelType || 'N/A'}, ${b.parcelWeight || 0}kg</p>
+                    <p><strong>COD:</strong> PKR ${b.codAmount || 0} | Value: PKR ${b.parcelValue || 0}</p>
+                    <p><strong>Status:</strong> <span class="status-badge status-${(b.status || 'booked').toLowerCase().replace(/\s+/g,'-')}">${b.status || 'Booked'}</span></p>
+                    <button class="btn btn-primary" onclick="document.getElementById('detailModal').classList.remove('active')">Close</button>
+                `;
+                document.getElementById('detailModal').classList.add('active');
+            }
+            document.getElementById('detailModal').addEventListener('click', function(e) {
+                if (e.target === this) this.classList.remove('active');
+            });
+
+            function showAddBookingForm() {
+                document.getElementById('pageContainer').innerHTML = `
+                    <div class="card">
+                        <h3>Add New Booking</h3>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;max-width:600px;">
+                            <input id="newSenderName" placeholder="Sender Name" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newSenderPhone" placeholder="Sender Phone" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newReceiverName" placeholder="Receiver Name" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newReceiverPhone" placeholder="Receiver Phone" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newReceiverCity" placeholder="City" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newParcelType" placeholder="Parcel Type" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newWeight" type="number" placeholder="Weight (kg)" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newCOD" type="number" placeholder="COD Amount" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <input id="newValue" type="number" placeholder="Parcel Value" style="padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <button class="btn btn-primary" id="saveNewBooking">Save Booking</button>
+                            <button class="btn btn-outline" id="cancelAddBooking">Cancel</button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('saveNewBooking').addEventListener('click', async () => {
+                    const tracking = 'PX' + Date.now().toString().slice(-6);
+                    const booking = {
+                        trackingNumber: tracking,
+                        senderName: document.getElementById('newSenderName').value,
+                        senderPhone: document.getElementById('newSenderPhone').value,
+                        senderEmail: '',
+                        senderAddress: '',
+                        receiverName: document.getElementById('newReceiverName').value,
+                        receiverPhone: document.getElementById('newReceiverPhone').value,
+                        receiverAddress: '',
+                        receiverCity: document.getElementById('newReceiverCity').value,
+                        parcelType: document.getElementById('newParcelType').value,
+                        parcelWeight: parseFloat(document.getElementById('newWeight').value) || 0,
+                        codAmount: parseFloat(document.getElementById('newCOD').value) || 0,
+                        parcelValue: parseFloat(document.getElementById('newValue').value) || 0,
+                        parcelDescription: '',
+                        bookingDate: new Date().toISOString(),
+                        status: 'Booked'
+                    };
+                    await DataService.addBooking(booking);
+                    loadPage('bookings');
+                });
+                document.getElementById('cancelAddBooking').addEventListener('click', () => loadPage('bookings'));
+            }
+
+            // ============ TRACKING ============
+            function renderTracking() {
+                document.getElementById('pageContainer').innerHTML = `
+                    <div class="card">
+                        <h3>Shipment Tracking</h3>
+                        <div style="display:flex;gap:12px;margin:16px 0;flex-wrap:wrap;">
+                            <input id="trackSearch" placeholder="Tracking number / phone / city" style="flex:1;padding:12px;border-radius:8px;border:1px solid var(--border);">
+                            <button class="btn btn-primary" id="trackBtn"><i class="fas fa-search"></i> Track</button>
+                        </div>
+                        <div id="trackResult"></div>
+                    </div>
+                `;
+                document.getElementById('trackBtn').addEventListener('click', async () => {
+                    const query = document.getElementById('trackSearch').value.trim().toLowerCase();
+                    const bookings = await DataService.getBookings();
+                    const results = bookings.filter(b =>
+                        (b.trackingNumber || '').toLowerCase().includes(query) ||
+                        (b.senderPhone || '').includes(query) || 
+                        (b.receiverPhone || '').includes(query) ||
+                        (b.receiverCity || '').toLowerCase().includes(query)
+                    );
+                    document.getElementById('trackResult').innerHTML = results.length ?
+                        `<table><tr><th>Tracking #</th><th>Status</th><th>Receiver</th><th>City</th></tr>${results.map(b => `<tr><td><strong>${b.trackingNumber}</strong></td><td><span class="status-badge status-${(b.status || 'booked').toLowerCase().replace(/\s+/g,'-')}">${b.status || 'Booked'}</span></td><td>${b.receiverName || 'N/A'}</td><td>${b.receiverCity || 'N/A'}</td></tr>`).join('')}</table>` :
+                        '<p>No results found.</p>';
+                });
+            }
+
+            // ============ CUSTOMERS ============
+            async function renderCustomers() {
+                const bookings = await DataService.getBookings();
+                const customersMap = new Map();
+                bookings.forEach(b => {
+                    const key = b.receiverPhone || 'unknown';
+                    if (!customersMap.has(key)) customersMap.set(key, { name: b.receiverName || 'N/A', phone: b.receiverPhone || 'N/A', city: b.receiverCity || 'N/A', count: 0 });
+                    customersMap.get(key).count++;
+                });
+                const customers = Array.from(customersMap.values());
+                document.getElementById('pageContainer').innerHTML = `
+                    <div class="card">
+                        <h3>Customer List</h3>
+                        <table>
+                            <thead><tr><th>Name</th><th>Phone</th><th>City</th><th>Shipments</th></tr></thead>
+                            <tbody>${customers.map(c => `<tr><td>${c.name}</td><td>${c.phone}</td><td>${c.city}</td><td>${c.count}</td></tr>`).join('')}</tbody>
+                        </table>
+                    </div>
+                `;
+            }
+
+            // ============ REPORTS ============
+            async function renderReports() {
+                const bookings = await DataService.getBookings();
+                const total = bookings.length;
+                const delivered = bookings.filter(b => b.status === 'Delivered').length;
+                const returned = bookings.filter(b => b.status === 'Returned').length;
+                const codCollected = bookings.filter(b => b.codAmount > 0 && b.status === 'Delivered').reduce((s,b) => s + b.codAmount, 0);
+                const codPending = bookings.filter(b => b.codAmount > 0 && !['Delivered','Returned'].includes(b.status)).reduce((s,b) => s + b.codAmount, 0);
+                const thisMonth = new Date().getMonth();
+                const monthly = bookings.filter(b => b.bookingDate && new Date(b.bookingDate).getMonth() === thisMonth).length;
+                document.getElementById('pageContainer').innerHTML = `
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-icon"><i class="fas fa-box"></i></div><div><h3>${total}</h3><p>Total Orders</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#ecfdf5;color:#10b981;"><i class="fas fa-check-double"></i></div><div><h3>${delivered}</h3><p>Delivered</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#fef2f2;color:#ef4444;"><i class="fas fa-undo"></i></div><div><h3>${returned}</h3><p>Returned</p></div></div>
+                        <div class="stat-card"><div class="stat-icon"><i class="fas fa-coins"></i></div><div><h3>PKR ${codCollected.toLocaleString()}</h3><p>COD Collected</p></div></div>
+                        <div class="stat-card"><div class="stat-icon" style="background:#fef3c7;"><i class="fas fa-hand-holding-usd"></i></div><div><h3>PKR ${codPending.toLocaleString()}</h3><p>Pending COD</p></div></div>
+                        <div class="stat-card"><div class="stat-icon"><i class="fas fa-calendar-alt"></i></div><div><h3>${monthly}</h3><p>Monthly Orders</p></div></div>
+                    </div>
+                    <div class="card"><h4>Monthly Trend</h4><div style="height:20px;background:var(--border);border-radius:10px;"><div style="width:${Math.min(monthly*3,100)}%;height:100%;background:#f47920;border-radius:10px;"></div></div></div>
+                `;
+            }
+
+            // Initial load
+            loadPage('dashboard');
+        })();
+    </script>
+</body>
+</html>
